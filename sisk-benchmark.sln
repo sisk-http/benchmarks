@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33723.286
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sisk-benchmark", "sisk-benchmark\sisk-benchmark.csproj", "{D75F0003-3E8F-499D-885D-51372C1C53B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "asp", "asp\asp.csproj", "{2B583AB2-B744-4020-881C-15236C320949}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sisk", "sisk\sisk.csproj", "{E2B23FA6-317D-4109-A5DC-001F634A5B17}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D75F0003-3E8F-499D-885D-51372C1C53B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D75F0003-3E8F-499D-885D-51372C1C53B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D75F0003-3E8F-499D-885D-51372C1C53B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D75F0003-3E8F-499D-885D-51372C1C53B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B583AB2-B744-4020-881C-15236C320949}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B583AB2-B744-4020-881C-15236C320949}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B583AB2-B744-4020-881C-15236C320949}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B583AB2-B744-4020-881C-15236C320949}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2B23FA6-317D-4109-A5DC-001F634A5B17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2B23FA6-317D-4109-A5DC-001F634A5B17}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2B23FA6-317D-4109-A5DC-001F634A5B17}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2B23FA6-317D-4109-A5DC-001F634A5B17}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {BE3001D6-8A08-4FFF-A557-18AC54CEA71B}
+	EndGlobalSection
+EndGlobal
