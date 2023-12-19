@@ -9,6 +9,6 @@ public class Program
 
         app.MapGet("/", () => "Hello World!");
 
-        app.Run();
+        app.Run("http://localhost:5000/");
     }
 }

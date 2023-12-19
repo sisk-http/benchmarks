@@ -1,5 +1,11 @@
 ﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Columns;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Running;
+using Microsoft.Extensions.Logging;
 
 namespace sisk_benchmark;
 
@@ -7,11 +13,26 @@ public static class Program
 {
     private static void Main()
     {
-        BenchmarkRunner.Run<SiskVsMinimalBenckmark>();
+        BenchmarkRunner.Run<Test1>(new Config());
+        Console.ReadKey();
     }
 }
 
-public class SiskVsMinimalBenckmark
+class Config : ManualConfig
+{
+    public Config()
+    {
+        AddLogger(new ConsoleLogger());
+        AddColumn(new TagColumn("Framework", name => name));
+        AddColumn(StatisticColumn.Mean);
+        AddColumn(StatisticColumn.StdDev);
+        AddColumn(StatisticColumn.StdErr);
+        AddColumn(StatisticColumn.OperationsPerSecond);
+        AddDiagnoser(MemoryDiagnoser.Default);
+    }
+}
+
+public class Test1
 {
     private HttpClient? _httpClient;
 
@@ -23,7 +44,4 @@ public class SiskVsMinimalBenckmark
 
     [Benchmark]
     public async Task SiskDotNet() => await _httpClient!.GetStringAsync("http://localhost:5222/");
-
-    [Benchmark]
-    public async Task SiskBFlat() => await _httpClient!.GetStringAsync("http://localhost:5111/");
 }
