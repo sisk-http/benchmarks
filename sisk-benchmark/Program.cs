@@ -6,6 +6,7 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace sisk_benchmark;
 
@@ -15,6 +16,24 @@ public static class Program
     {
         BenchmarkRunner.Run<Test1>(new Config());
         Console.ReadKey();
+    }
+
+    private static void RunRace(string label, Func<Task> action)
+    {
+        double max = TimeSpan.FromSeconds(10).TotalMilliseconds;
+        int count = 0;
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
+        var raceTask = Task.Run(async () =>
+        {
+            while (sw.ElapsedMilliseconds < max)
+            {
+                await action();
+                count++;
+            }
+        });
+        raceTask.Wait();
+        Console.WriteLine($"Race \"{label}\" result in 10 seconds: {count} iterations");
     }
 }
 

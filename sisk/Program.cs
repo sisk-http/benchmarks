@@ -7,7 +7,7 @@ class Program
     {
         var app = HttpServer.CreateBuilder(host => host.UseListeningPort(5222));
         
-        app.Router.SetRoute(RouteMethod.Get, "/", req => new HttpResponse().WithContent("Hello, world!"));
+        app.Router.SetRoute(RouteMethod.Get, "/", req => new HttpResponse("Hello, world!"));
 
         app.Start();
     }

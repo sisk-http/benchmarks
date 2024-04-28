@@ -4,46 +4,52 @@ The tests below were performed to improve the quality of Sisk. All tests are rep
 
 Both applications were compiled in RELEASE and return a plain "Hello, world!". The K6 version used in these tests was v0.46.0.
 
-Sisk could handle 44.029 requests per second while ASP.NET got 51.766, using their Kestrel socket implementation. Sisk does uses HttpListener. Sisk is around 15%-20% slower than ASP.NET/Kestrel. We need to improve it.
+Sisk could handle 55.462 requests per second while ASP.NET got 63.728, using their Kestrel socket implementation. Sisk does uses HttpListener.
 
 ## Benchmark.NET
 
 ```
-BenchmarkDotNet v0.13.7, Windows 11 (10.0.22631.2861)
+BenchmarkDotNet v0.13.7, Windows 10 (10.0.19044.4291/21H2/November2021Update)
 Intel Core i3-10105F CPU 3.70GHz, 1 CPU, 8 logical and 4 physical cores
-.NET SDK 8.0.100
-  [Host]     : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
-  DefaultJob : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
-```
+.NET SDK 9.0.100-preview.3.24204.13
+  [Host]     : .NET 8.0.4 (8.0.424.16909), X64 RyuJIT AVX2
+  DefaultJob : .NET 8.0.4 (8.0.424.16909), X64 RyuJIT AVX2
 
-| Framework     |      Mean |   StdDev |   StdErr |     Op/s |
-|-------------- |----------:|---------:|---------:|---------:|
-| AspNetMinimal |  96.64 us | 0.380 us | 0.095 us | 10,348.1 |
-| SiskDotNet    | 110.36 us | 0.383 us | 0.099 us |  9,061.4 |
+
+|     Mean |   StdDev |   StdErr |     Op/s |     Framework |
+|---------:|---------:|---------:|---------:|-------------- |
+| 52.71 us | 1.754 us | 0.285 us | 18,970.8 | AspNetMinimal |
+| 63.14 us | 0.187 us | 0.050 us | 15,838.4 |    SiskDotNet |
+
+```
 
 ## K6
 
 Sisk:
 
 ```
-  scenarios: (100.00%) 1 scenario, 500 max VUs, 1m0s max duration (incl. graceful stop):
-           * default: 500 looping VUs for 30s (gracefulStop: 30s)
+     execution: local
+        script: k6-sisk.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 500 max VUs, 1m30s max duration (incl. graceful stop):
+              * default: 500 looping VUs for 1m0s (gracefulStop: 30s)
 
 
-     data_received..................: 246 MB  8.2 MB/s
-     data_sent......................: 106 MB  3.5 MB/s
-     http_req_blocked...............: avg=7.84µs  min=0s med=0s      max=70.35ms  p(90)=0s      p(95)=0s
-     http_req_connecting............: avg=3.88µs  min=0s med=0s      max=22.57ms  p(90)=0s      p(95)=0s
-     http_req_duration..............: avg=11.18ms min=0s med=10.53ms max=111.62ms p(90)=15.34ms p(95)=18.64ms
-       { expected_response:true }...: avg=11.18ms min=0s med=10.53ms max=111.62ms p(90)=15.34ms p(95)=18.64ms
-     http_req_failed................: 0.00%   ✓ 0            ✗ 1321362
-     http_req_receiving.............: avg=41.89µs min=0s med=0s      max=93.87ms  p(90)=0s      p(95)=0s
-     http_req_sending...............: avg=15.95µs min=0s med=0s      max=88.68ms  p(90)=0s      p(95)=0s
-     http_req_tls_handshaking.......: avg=0s      min=0s med=0s      max=0s       p(90)=0s      p(95)=0s
-     http_req_waiting...............: avg=11.12ms min=0s med=10.52ms max=81.43ms  p(90)=15.27ms p(95)=18.51ms
-     http_reqs......................: 1321362 44029.579878/s
-     iteration_duration.............: avg=11.31ms min=0s med=10.58ms max=111.62ms p(90)=15.55ms p(95)=19.48ms
-     iterations.....................: 1321362 44029.579878/s
+     data_received..................: 630 MB  11 MB/s
+     data_sent......................: 271 MB  4.5 MB/s
+     http_req_blocked...............: avg=1.76µs  min=0s med=0s     max=26.63ms  p(90)=0s      p(95)=0s
+     http_req_connecting............: avg=109ns   min=0s med=0s     max=4.98ms   p(90)=0s      p(95)=0s
+     http_req_duration..............: avg=8.79ms  min=0s med=8.1ms  max=237ms    p(90)=11.96ms p(95)=13.89ms
+       { expected_response:true }...: avg=8.79ms  min=0s med=8.1ms  max=237ms    p(90)=11.96ms p(95)=13.89ms
+     http_req_failed................: 0.00%   ✓ 0            ✗ 3388041
+     http_req_receiving.............: avg=264.8µs min=0s med=0s     max=50.39ms  p(90)=0s      p(95)=0s
+     http_req_sending...............: avg=11.59µs min=0s med=0s     max=65.94ms  p(90)=0s      p(95)=0s
+     http_req_tls_handshaking.......: avg=0s      min=0s med=0s     max=0s       p(90)=0s      p(95)=0s
+     http_req_waiting...............: avg=8.51ms  min=0s med=8.06ms max=234.01ms p(90)=11.96ms p(95)=13.78ms
+     http_reqs......................: 3388041 56462.140897/s
+     iteration_duration.............: avg=8.84ms  min=0s med=8.14ms max=244.61ms p(90)=11.96ms p(95)=13.95ms
+     iterations.....................: 3388041 56462.140897/s
      vus............................: 500     min=500        max=500
      vus_max........................: 500     min=500        max=500
 ```
@@ -51,24 +57,27 @@ Sisk:
 ASP.NET Minimal:
 
 ```
-  scenarios: (100.00%) 1 scenario, 500 max VUs, 1m0s max duration (incl. graceful stop):
-           * default: 500 looping VUs for 30s (gracefulStop: 30s)
+     execution: local
+        script: k6-asp.js
+        output: -
 
+     scenarios: (100.00%) 1 scenario, 500 max VUs, 1m30s max duration (incl. graceful stop):
+              * default: 500 looping VUs for 1m0s (gracefulStop: 30s)
 
-     data_received..................: 255 MB  8.5 MB/s
-     data_sent......................: 124 MB  4.1 MB/s
-     http_req_blocked...............: avg=105.19µs min=0s med=0s     max=537.38ms p(90)=0s      p(95)=0s
-     http_req_connecting............: avg=97.47µs  min=0s med=0s     max=530.34ms p(90)=0s      p(95)=0s
-     http_req_duration..............: avg=9.03ms   min=0s med=8.52ms max=306.34ms p(90)=11.24ms p(95)=14.81ms
-       { expected_response:true }...: avg=9.03ms   min=0s med=8.52ms max=306.34ms p(90)=11.24ms p(95)=14.81ms
-     http_req_failed................: 0.00%   ✓ 0            ✗ 1553207
-     http_req_receiving.............: avg=48.53µs  min=0s med=0s     max=296.69ms p(90)=0s      p(95)=0s
-     http_req_sending...............: avg=20.31µs  min=0s med=0s     max=86.06ms  p(90)=0s      p(95)=0s
-     http_req_tls_handshaking.......: avg=0s       min=0s med=0s     max=0s       p(90)=0s      p(95)=0s
-     http_req_waiting...............: avg=8.96ms   min=0s med=8.52ms max=196.61ms p(90)=11.14ms p(95)=14.49ms
-     http_reqs......................: 1553207 51766.383908/s
-     iteration_duration.............: avg=9.56ms   min=0s med=8.52ms max=566.56ms p(90)=11.68ms p(95)=16.93ms
-     iterations.....................: 1553207 51766.383908/s
+     data_received..................: 627 MB  10 MB/s
+     data_sent......................: 306 MB  5.1 MB/s
+     http_req_blocked...............: avg=2.44µs   min=0s med=0s     max=110.6ms  p(90)=0s     p(95)=0s
+     http_req_connecting............: avg=109ns    min=0s med=0s     max=9.62ms   p(90)=0s     p(95)=0s
+     http_req_duration..............: avg=7.61ms   min=0s med=6.98ms max=269.14ms p(90)=9.25ms p(95)=11.12ms
+       { expected_response:true }...: avg=7.61ms   min=0s med=6.98ms max=269.14ms p(90)=9.25ms p(95)=11.13ms
+     http_req_failed................: 0.03%   ✓ 1367         ✗ 3822574
+     http_req_receiving.............: avg=316.12µs min=0s med=0s     max=150.44ms p(90)=0s     p(95)=0s
+     http_req_sending...............: avg=16.03µs  min=0s med=0s     max=135.54ms p(90)=0s     p(95)=0s
+     http_req_tls_handshaking.......: avg=0s       min=0s med=0s     max=0s       p(90)=0s     p(95)=0s
+     http_req_waiting...............: avg=7.28ms   min=0s med=6.98ms max=269.14ms p(90)=9.15ms p(95)=10.97ms
+     http_reqs......................: 3823941 63728.188762/s
+     iteration_duration.............: avg=7.8ms    min=0s med=6.98ms max=276.77ms p(90)=9.65ms p(95)=11.7ms
+     iterations.....................: 3823941 63728.188762/s
      vus............................: 500     min=500        max=500
      vus_max........................: 500     min=500        max=500
 ```
