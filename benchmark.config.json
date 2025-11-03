@@ -1,0 +1,43 @@
+{
+    "dotnetExecutable": "dotnet",
+    "bombardierExecutable": "bombardier",
+    "resultsDir": "benchmark-results",
+    "projects": [
+        {
+            "name": "asp",
+            "path": "tests/asp",
+            "port": 5111,
+            "healthPath": "/plaintext",
+            "benchmarkPath": "/plaintext",
+            "buildConfiguration": "Release",
+            "benchmark": {
+                "vus": 100,
+                "duration": "30s"
+            }
+        },
+        {
+            "name": "sisk",
+            "path": "tests/sisk",
+            "port": 5222,
+            "healthPath": "/",
+            "benchmarkPath": "/",
+            "buildConfiguration": "Release",
+            "benchmark": {
+                "vus": 100,
+                "duration": "30s"
+            }
+        },
+        {
+            "name": "sisk-cadente",
+            "path": "tests/sisk-cadente",
+            "port": 5333,
+            "healthPath": "/",
+            "benchmarkPath": "/",
+            "buildConfiguration": "Release",
+            "benchmark": {
+                "vus": 100,
+                "duration": "30s"
+            }
+        }
+    ]
+}

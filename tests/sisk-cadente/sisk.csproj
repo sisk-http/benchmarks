@@ -2,14 +2,15 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>net8.0</TargetFramework>
-		<RootNamespace>sisk_benchmark</RootNamespace>
+		<TargetFramework>net9.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<ServerGarbageCollection>true</ServerGarbageCollection>
+		<PublishAot>true</PublishAot>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
+	  <PackageReference Include="Sisk.Cadente.CoreEngine" Version="1.6.0-beta2" />
 	</ItemGroup>
 
 </Project>
