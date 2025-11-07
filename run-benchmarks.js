@@ -132,9 +132,15 @@ async function waitForServer({ url, timeoutMs, pollIntervalMs, server, name }) {
     throw new Error(`Timed out waiting for ${name} at ${url}`);
 }
 
-async function runBenchmark({ name, bombardierExecutable, targetUrl, connections, outputPath }) {
+async function runBenchmark({ name, bombardierExecutable, targetUrl, connections, outputPath, warmupDurationSeconds = 0 }) {
     return new Promise((resolve, reject) => {
-        const args = [`--format=json`, `--connections=${connections}`, targetUrl];
+        const args = [`--format=json`, `--fasthttp`, `--connections=${connections}`];
+
+        if (warmupDurationSeconds > 0) {
+            args.push(`--duration=${warmupDurationSeconds}s`);
+        }
+
+        args.push(targetUrl);
 
         const child = spawn(bombardierExecutable, args, {
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -142,30 +148,19 @@ async function runBenchmark({ name, bombardierExecutable, targetUrl, connections
 
         let stdout = '';
         let stderr = '';
-        let stdoutEnded = false;
-        let stderrEnded = false;
 
         child.stdout.on('data', (chunk) => {
             stdout += chunk.toString();
         });
-
-        child.stdout.on('end', () => {
-            stdoutEnded = true;
-        });
-
         child.stderr.on('data', (chunk) => {
             const text = chunk.toString();
             stderr += text;
             process.stderr.write(text);
         });
 
-        child.stderr.on('end', () => {
-            stderrEnded = true;
-        });
-
         child.once('error', reject);
         child.once('exit', async (code, signal) => {
-            // Wait a bit to ensure all data is flushed
+
             await sleep(100);
 
             if (code === 0) {
@@ -174,7 +169,10 @@ async function runBenchmark({ name, bombardierExecutable, targetUrl, connections
                     const jsonMatch = stdout.match(/\{[\s\S]*\}/);
                     const jsonOutput = jsonMatch ? jsonMatch[0] : stdout;
 
-                    await fs.writeFile(outputPath, jsonOutput, 'utf8');
+                    if (outputPath) {
+                        await fs.writeFile(outputPath, jsonOutput, 'utf8');
+                    }
+
                     resolve(jsonOutput);
                 } catch (error) {
                     reject(error);
@@ -217,10 +215,13 @@ async function parseBombardierJson(jsonOutput) {
 }
 
 function formatNumber(value, digits = 2) {
-    return Number(value).toFixed(digits);
+    const fixed = Number(value).toFixed(digits);
+    const [integer, decimal] = fixed.split('.');
+    const formattedInteger = integer.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return decimal !== undefined ? `${formattedInteger},${decimal}` : formattedInteger;
 }
 
-function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report') {
+function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report', insights = null) {
     const lines = [];
     const successes = entries.filter((entry) => entry.type === 'success');
     const failures = entries.filter((entry) => entry.type === 'error');
@@ -229,6 +230,13 @@ function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report')
     lines.push('');
     lines.push(`Generated at ${generatedAt.toISOString()}`);
     lines.push('');
+
+    if (insights) {
+        lines.push('## AI generated insights');
+        lines.push('');
+        lines.push(insights);
+        lines.push('');
+    }
 
     if (successes.length) {
         // Group by project
@@ -245,10 +253,26 @@ function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report')
         const projectNames = Array.from(projectMap.keys()).sort();
         const baselineName = projectNames[0];
 
+        // Calculate best (highest) requests/s for each connection level to compute ratios
+        const bestRpsByConnections = new Map();
+        for (const projectName of projectNames) {
+            const projectEntries = projectMap.get(projectName);
+            for (const entry of projectEntries) {
+                const metrics = entry.allMetrics || [entry.metrics];
+                for (const m of metrics) {
+                    const connections = m.connections || 'N/A';
+                    const current = bestRpsByConnections.get(connections) || 0;
+                    if (m.requestsPerSecond > current) {
+                        bestRpsByConnections.set(connections, m.requestsPerSecond);
+                    }
+                }
+            }
+        }
+
         lines.push('## Summary');
         lines.push('');
-        lines.push('| Baseline | Connections | Requests/s | Avg Latency (ms) | p50 (rps) | p75 (rps) | p90 (rps) | p95 (rps) | p99 (rps) | Max Latency (ms) | Total Requests |');
-        lines.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
+        lines.push('| Project | Connections | Requests/s | Ratio | Avg Latency (ms) | p50 (rps) | p75 (rps) | p90 (rps) | p95 (rps) | p99 (rps) | Max Latency (ms) | Total Requests |');
+        lines.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
 
         for (const projectName of projectNames) {
             const projectEntries = projectMap.get(projectName);
@@ -258,11 +282,13 @@ function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report')
                 const metrics = entry.allMetrics || [entry.metrics];
 
                 for (const m of metrics) {
-                    const baseline = isBaseline ? '✓' : '';
+                    const baseline = isBaseline ? ' ✓' : '';
                     const connections = m.connections || 'N/A';
+                    const bestRps = bestRpsByConnections.get(connections) || m.requestsPerSecond;
+                    const ratio = (m.requestsPerSecond / bestRps).toFixed(2);
 
                     lines.push(
-                        `| ${projectName} ${baseline} | ${connections} | ${formatNumber(m.requestsPerSecond, 2)} | ${formatNumber(m.avgMs, 3)} | ${formatNumber(m.p50Ms, 0)} | ${formatNumber(m.p75Ms, 0)} | ${formatNumber(m.p90Ms, 0)} | ${formatNumber(m.p95Ms, 0)} | ${formatNumber(m.p99Ms, 0)} | ${formatNumber(m.maxMs, 3)} | ${formatNumber(m.requests, 0)} |`
+                        `| ${projectName}${baseline} | ${connections} | ${formatNumber(m.requestsPerSecond, 2)} | ${ratio} | ${formatNumber(m.avgMs, 3)} | ${formatNumber(m.p50Ms, 0)} | ${formatNumber(m.p75Ms, 0)} | ${formatNumber(m.p90Ms, 0)} | ${formatNumber(m.p95Ms, 0)} | ${formatNumber(m.p99Ms, 0)} | ${formatNumber(m.maxMs, 3)} | ${formatNumber(m.requests, 0)} |`
                     );
                 }
             }
@@ -363,10 +389,22 @@ async function main() {
             });
 
             const targetUrl = project.benchmark?.targetUrl || composeUrl(project.port, project.benchmarkPath || project.healthPath || '/');
-            const connectionLevels = [10, 100, 500];
+            const connectionLevels = [10, 100, 500, 1000];
             const allMetrics = [];
 
             for (const connections of connectionLevels) {
+                console.log(`=== ${name}: warmup with ${connections} connections (5 seconds) ===`);
+
+                // Warmup phase - 5 seconds
+                await runBenchmark({
+                    name,
+                    bombardierExecutable: config.bombardierExecutable || 'bombardier',
+                    targetUrl,
+                    connections,
+                    outputPath: null,
+                    warmupDurationSeconds: 5,
+                });
+
                 console.log(`=== ${name}: benchmark with ${connections} connections ===`);
 
                 const outputPath = path.join(resultsDir, `test-${name}-${connections}.json`);
@@ -403,7 +441,40 @@ async function main() {
 
     await fs.mkdir(path.dirname(reportPath), { recursive: true });
 
-    const markdown = buildDetailedMarkdown(entries, generatedAt, config.reportTitle || 'Benchmark Report');
+    // Generate initial markdown without insights
+    const initialMarkdown = buildDetailedMarkdown(entries, generatedAt, config.reportTitle || 'Benchmark Report');
+
+    // Try to get insights from API
+    let insights = null;
+    const apiKey = process.env.AIVAX_API_KEY;
+
+    if (apiKey) {
+        try {
+            console.log('\nFetching insights from AI...');
+            const response = await fetch('https://inference.aivax.net/api/v1/functions/hosted/019a5f3d-6452-731b-ba6c-2bbb07569ff3/benchmark-summary', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'text/plain',
+                },
+                body: initialMarkdown,
+            });
+
+            if (response.ok) {
+                insights = await response.text();
+                console.log('Insights received successfully');
+            } else {
+                console.warn(`Failed to fetch insights: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.warn(`Error fetching insights: ${error.message}`);
+        }
+    } else {
+        console.log('\nSkipping insights generation (AIVAX_API_KEY not set)');
+    }
+
+    // Generate final markdown with insights
+    const markdown = buildDetailedMarkdown(entries, generatedAt, config.reportTitle || 'Benchmark Report', insights);
     await fs.writeFile(reportPath, `${markdown}\n`, 'utf8');
 
     console.log(`\nReport written to ${path.relative(workspaceRoot, reportPath)}`);

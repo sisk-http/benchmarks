@@ -9,11 +9,7 @@
             "port": 5111,
             "healthPath": "/plaintext",
             "benchmarkPath": "/plaintext",
-            "buildConfiguration": "Release",
-            "benchmark": {
-                "vus": 100,
-                "duration": "30s"
-            }
+            "buildConfiguration": "Release"
         },
         {
             "name": "sisk",
@@ -21,11 +17,7 @@
             "port": 5222,
             "healthPath": "/",
             "benchmarkPath": "/",
-            "buildConfiguration": "Release",
-            "benchmark": {
-                "vus": 100,
-                "duration": "30s"
-            }
+            "buildConfiguration": "Release"
         },
         {
             "name": "sisk-cadente",
@@ -33,11 +25,15 @@
             "port": 5333,
             "healthPath": "/",
             "benchmarkPath": "/",
-            "buildConfiguration": "Release",
-            "benchmark": {
-                "vus": 100,
-                "duration": "30s"
-            }
+            "buildConfiguration": "Release"
+        },
+        {
+            "name": "sisk-cadente-core",
+            "path": "tests/sisk-cadente-core",
+            "port": 5444,
+            "healthPath": "/",
+            "benchmarkPath": "/",
+            "buildConfiguration": "Release"
         }
     ]
 }

@@ -10,7 +10,7 @@ internal class Program
         };
 
         cadenteHost.Start();
-        Thread.Sleep(-1);
+        await Task.Delay(-1);
     }
 }
 
