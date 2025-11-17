@@ -2,6 +2,7 @@
 
 const path = require('path');
 const fs = require('fs/promises');
+const os = require('os');
 const { spawn } = require('child_process');
 const { setTimeout: sleep } = require('timers/promises');
 
@@ -214,6 +215,70 @@ async function parseBombardierJson(jsonOutput) {
     };
 }
 
+async function getCommandStdout(command, args = []) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, args, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (chunk) => {
+            stdout += chunk.toString();
+        });
+
+        child.stderr.on('data', (chunk) => {
+            stderr += chunk.toString();
+        });
+
+        child.once('error', reject);
+        child.once('exit', (code) => {
+            if (code === 0) {
+                resolve(stdout.trim());
+                return;
+            }
+
+            const reason = stderr ? `${stderr.trim()}` : `exit code ${code}`;
+            reject(new Error(`${command} ${args.join(' ')} failed: ${reason}`));
+        });
+    });
+}
+
+async function tryGetCommandVersion(command, args) {
+    try {
+        const output = await getCommandStdout(command, args);
+        const firstLine = output.split(/\r?\n/).find((line) => line.trim().length);
+        return firstLine || output;
+    } catch (error) {
+        console.warn(`Unable to retrieve version for ${command}: ${error.message}`);
+        return null;
+    }
+}
+
+async function collectEnvironmentInfo(config) {
+    const cpus = os.cpus();
+    const cpuModelRaw = cpus && cpus.length ? cpus[0].model : null;
+    const cpuModel = (cpuModelRaw || 'Unknown CPU').trim();
+    const osInfo = `${os.type()} ${os.release()} (${os.platform()})`;
+    const architecture = process.arch;
+    const totalMemoryGb = os.totalmem() / (1024 ** 3);
+    const dotnetExecutable = config.dotnetExecutable || 'dotnet';
+    const bombardierExecutable = config.bombardierExecutable || 'bombardier';
+
+    const dotnetVersion = await tryGetCommandVersion(dotnetExecutable, ['--version']);
+    const bombardierVersion = await tryGetCommandVersion(bombardierExecutable, ['--version']);
+
+    return {
+        cpu: cpuModel,
+        os: osInfo,
+        architecture,
+        ram: `${totalMemoryGb.toFixed(2)} GB`,
+        dotnet: dotnetVersion ? `${dotnetExecutable} ${dotnetVersion}` : `${dotnetExecutable} (version unknown)`,
+        bombardier: bombardierVersion ? `${bombardierExecutable} ${bombardierVersion}` : `${bombardierExecutable} (version unknown)`,
+    };
+}
+
 function formatNumber(value, digits = 2) {
     const fixed = Number(value).toFixed(digits);
     const [integer, decimal] = fixed.split('.');
@@ -221,7 +286,28 @@ function formatNumber(value, digits = 2) {
     return decimal !== undefined ? `${formattedInteger},${decimal}` : formattedInteger;
 }
 
-function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report', insights = null) {
+function sortConnectionLevels(connectionLevels) {
+    return connectionLevels.sort((a, b) => {
+        const isNumberA = typeof a === 'number';
+        const isNumberB = typeof b === 'number';
+
+        if (isNumberA && isNumberB) {
+            return a - b;
+        }
+
+        if (isNumberA) {
+            return -1;
+        }
+
+        if (isNumberB) {
+            return 1;
+        }
+
+        return String(a).localeCompare(String(b));
+    });
+}
+
+function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report', insights = null, environmentInfo = null) {
     const lines = [];
     const successes = entries.filter((entry) => entry.type === 'success');
     const failures = entries.filter((entry) => entry.type === 'error');
@@ -230,6 +316,18 @@ function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report',
     lines.push('');
     lines.push(`Generated at ${generatedAt.toISOString()}`);
     lines.push('');
+
+    if (environmentInfo) {
+        lines.push('## Environment');
+        lines.push('');
+        lines.push(`- **Processor:** ${environmentInfo.cpu}`);
+        lines.push(`- **Operating system:** ${environmentInfo.os}`);
+        lines.push(`- **Architecture:** ${environmentInfo.architecture}`);
+        lines.push(`- **RAM:** ${environmentInfo.ram}`);
+        lines.push(`- **.NET executable:** ${environmentInfo.dotnet}`);
+        lines.push(`- **Bombardier:** ${environmentInfo.bombardier}`);
+        lines.push('');
+    }
 
     if (insights) {
         lines.push('## AI generated insights');
@@ -255,12 +353,14 @@ function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report',
 
         // Calculate best (highest) requests/s for each connection level to compute ratios
         const bestRpsByConnections = new Map();
+        const connectionLevelsSet = new Set();
         for (const projectName of projectNames) {
             const projectEntries = projectMap.get(projectName);
             for (const entry of projectEntries) {
                 const metrics = entry.allMetrics || [entry.metrics];
                 for (const m of metrics) {
-                    const connections = m.connections || 'N/A';
+                    const connections = m.connections ?? 'N/A';
+                    connectionLevelsSet.add(connections);
                     const current = bestRpsByConnections.get(connections) || 0;
                     if (m.requestsPerSecond > current) {
                         bestRpsByConnections.set(connections, m.requestsPerSecond);
@@ -271,30 +371,46 @@ function buildDetailedMarkdown(entries, generatedAt, title = 'Benchmark Report',
 
         lines.push('## Summary');
         lines.push('');
-        lines.push('| Project | Connections | Requests/s | Ratio | Avg Latency (ms) | p50 (rps) | p75 (rps) | p90 (rps) | p95 (rps) | p99 (rps) | Max Latency (ms) | Total Requests |');
-        lines.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
+        const connectionLevels = sortConnectionLevels(Array.from(connectionLevelsSet));
 
-        for (const projectName of projectNames) {
-            const projectEntries = projectMap.get(projectName);
-            const isBaseline = projectName === baselineName;
+        for (const connection of connectionLevels) {
+            const label = connection === 'N/A' ? 'Default' : `${connection}`;
+            lines.push(`### ${label} connections`);
+            lines.push('');
+            lines.push('| Project | Requests/s | Ratio | Avg Latency (ms) | p50 (rps) | p75 (rps) | p90 (rps) | p95 (rps) | p99 (rps) | Max Latency (ms) | Total Requests |');
+            lines.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
 
-            for (const entry of projectEntries) {
-                const metrics = entry.allMetrics || [entry.metrics];
+            let rowsAdded = 0;
 
-                for (const m of metrics) {
-                    const baseline = isBaseline ? ' ✓' : '';
-                    const connections = m.connections || 'N/A';
-                    const bestRps = bestRpsByConnections.get(connections) || m.requestsPerSecond;
-                    const ratio = (m.requestsPerSecond / bestRps).toFixed(2);
+            for (const projectName of projectNames) {
+                const projectEntries = projectMap.get(projectName);
+                const isBaseline = projectName === baselineName;
 
-                    lines.push(
-                        `| ${projectName}${baseline} | ${connections} | ${formatNumber(m.requestsPerSecond, 2)} | ${ratio} | ${formatNumber(m.avgMs, 3)} | ${formatNumber(m.p50Ms, 0)} | ${formatNumber(m.p75Ms, 0)} | ${formatNumber(m.p90Ms, 0)} | ${formatNumber(m.p95Ms, 0)} | ${formatNumber(m.p99Ms, 0)} | ${formatNumber(m.maxMs, 3)} | ${formatNumber(m.requests, 0)} |`
-                    );
+                for (const entry of projectEntries) {
+                    const metrics = entry.allMetrics || [entry.metrics];
+
+                    for (const m of metrics) {
+                        const metricConnection = m.connections ?? 'N/A';
+                        if (metricConnection !== connection) {
+                            continue;
+                        }
+
+                        const baseline = isBaseline ? ' ✓' : '';
+                        const bestRps = bestRpsByConnections.get(connection) || m.requestsPerSecond;
+                        const ratioValue = bestRps > 0 ? (m.requestsPerSecond / bestRps) : 0;
+                        const ratio = ratioValue.toFixed(2);
+
+                        lines.push(
+                            `| ${projectName}${baseline} | ${formatNumber(m.requestsPerSecond, 2)} | ${ratio} | ${formatNumber(m.avgMs, 3)} | ${formatNumber(m.p50Ms, 0)} | ${formatNumber(m.p75Ms, 0)} | ${formatNumber(m.p90Ms, 0)} | ${formatNumber(m.p95Ms, 0)} | ${formatNumber(m.p99Ms, 0)} | ${formatNumber(m.maxMs, 3)} | ${formatNumber(m.requests, 0)} |`
+                        );
+                        rowsAdded += 1;
+                    }
                 }
             }
+
+            lines.push('');
         }
 
-        lines.push('');
         lines.push('## Detailed Metrics by Project');
         lines.push('');
 
@@ -335,6 +451,7 @@ async function main() {
     const configPath = path.resolve(workspaceRoot, 'benchmark.config.json');
     const config = JSON.parse(await fs.readFile(configPath, 'utf8'));
     const generatedAt = new Date();
+    const environmentInfo = await collectEnvironmentInfo(config);
     const entries = [];
 
     const resultsDir = path.resolve(workspaceRoot, config.resultsDir || 'benchmark-results');
@@ -442,7 +559,7 @@ async function main() {
     await fs.mkdir(path.dirname(reportPath), { recursive: true });
 
     // Generate initial markdown without insights
-    const initialMarkdown = buildDetailedMarkdown(entries, generatedAt, config.reportTitle || 'Benchmark Report');
+    const initialMarkdown = buildDetailedMarkdown(entries, generatedAt, config.reportTitle || 'Benchmark Report', null, environmentInfo);
 
     // Try to get insights from API
     let insights = null;
@@ -474,7 +591,7 @@ async function main() {
     }
 
     // Generate final markdown with insights
-    const markdown = buildDetailedMarkdown(entries, generatedAt, config.reportTitle || 'Benchmark Report', insights);
+    const markdown = buildDetailedMarkdown(entries, generatedAt, config.reportTitle || 'Benchmark Report', insights, environmentInfo);
     await fs.writeFile(reportPath, `${markdown}\n`, 'utf8');
 
     console.log(`\nReport written to ${path.relative(workspaceRoot, reportPath)}`);
