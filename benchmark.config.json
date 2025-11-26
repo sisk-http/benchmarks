@@ -2,6 +2,16 @@
     "dotnetExecutable": "dotnet",
     "bombardierExecutable": "bombardier",
     "resultsDir": "benchmark-results",
+    "benchmark": {
+        "connectionLevels": [
+            10,
+            100,
+            500,
+            1000
+        ],
+        "warmupDuration": 10,
+        "benchmarkDuration": 20
+    },
     "projects": [
         {
             "name": "ASP.NET Minimal",
@@ -9,22 +19,6 @@
             "port": 5111,
             "healthPath": "/plaintext",
             "benchmarkPath": "/plaintext",
-            "buildConfiguration": "Release"
-        },
-        {
-            "name": "Sisk (HttpListener)",
-            "path": "tests/sisk",
-            "port": 5222,
-            "healthPath": "/",
-            "benchmarkPath": "/",
-            "buildConfiguration": "Release"
-        },
-        {
-            "name": "Sisk (Cadente)",
-            "path": "tests/sisk-cadente-core",
-            "port": 5444,
-            "healthPath": "/",
-            "benchmarkPath": "/",
             "buildConfiguration": "Release"
         },
         {
@@ -39,6 +33,22 @@
             "name": "HttpListener",
             "path": "tests/httplistener",
             "port": 5556,
+            "healthPath": "/",
+            "benchmarkPath": "/",
+            "buildConfiguration": "Release"
+        },
+        {
+            "name": "Sisk (Cadente)",
+            "path": "tests/sisk-cadente-core",
+            "port": 5444,
+            "healthPath": "/",
+            "benchmarkPath": "/",
+            "buildConfiguration": "Release"
+        },
+        {
+            "name": "Sisk (HttpListener)",
+            "path": "tests/sisk",
+            "port": 5222,
             "healthPath": "/",
             "benchmarkPath": "/",
             "buildConfiguration": "Release"

@@ -133,14 +133,9 @@ async function waitForServer({ url, timeoutMs, pollIntervalMs, server, name }) {
     throw new Error(`Timed out waiting for ${name} at ${url}`);
 }
 
-async function runBenchmark({ name, bombardierExecutable, targetUrl, connections, outputPath, warmupDurationSeconds = 0 }) {
+async function runBenchmark({ name, bombardierExecutable, targetUrl, connections, outputPath, duration }) {
     return new Promise((resolve, reject) => {
-        const args = [`--format=json`, `--fasthttp`, `--connections=${connections}`];
-
-        if (warmupDurationSeconds > 0) {
-            args.push(`--duration=${warmupDurationSeconds}s`);
-        }
-
+        const args = [`--format=json`, `--fasthttp`, `--connections=${connections}`, `--duration=${duration}s`];
         args.push(targetUrl);
 
         const child = spawn(bombardierExecutable, args, {
@@ -506,11 +501,11 @@ async function main() {
             });
 
             const targetUrl = project.benchmark?.targetUrl || composeUrl(project.port, project.benchmarkPath || project.healthPath || '/');
-            const connectionLevels = [10, 100, 500, 1000];
+            const connectionLevels = config.benchmark.connectionLevels;
             const allMetrics = [];
 
             for (const connections of connectionLevels) {
-                console.log(`=== ${name}: warmup with ${connections} connections (5 seconds) ===`);
+                console.log(`=== ${name}: warmup with ${connections} connections ===`);
 
                 // Warmup phase - 5 seconds
                 await runBenchmark({
@@ -519,7 +514,7 @@ async function main() {
                     targetUrl,
                     connections,
                     outputPath: null,
-                    warmupDurationSeconds: 5,
+                    duration: config.benchmark.warmupDuration
                 });
 
                 console.log(`=== ${name}: benchmark with ${connections} connections ===`);
@@ -532,6 +527,7 @@ async function main() {
                     targetUrl,
                     connections,
                     outputPath,
+                    duration: config.benchmark.benchmarkDuration
                 });
 
                 const metrics = await parseBombardierJson(output);
