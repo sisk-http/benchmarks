@@ -10,7 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\..\core\cadente\Sisk.Cadente\Sisk.Cadente.csproj" />
+		<PackageReference Include="Sisk.Cadente.CoreEngine" Version="1.6.0-beta7" />
 	</ItemGroup>
 
 </Project>

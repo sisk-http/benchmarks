@@ -10,7 +10,7 @@
             1000
         ],
         "warmupDuration": 10,
-        "benchmarkDuration": 20
+        "benchmarkDuration": 45
     },
     "projects": [
         {
